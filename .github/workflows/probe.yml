@@ -1,0 +1,52 @@
+name: uvm-probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout upstream verilator
+        uses: actions/checkout@v5
+        with:
+          repository: verilator/verilator
+          ref: master
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends git perl python3 make autoconf g++ flex libfl2 libfl-dev bison ccache ninja-build help2man
+          sudo apt-get install -y --no-install-recommends libgoogle-perftools-dev numactl zlibc || true
+
+      - name: Build
+        run: |
+          autoconf
+          ./configure
+          make -j "$(nproc)"
+
+      - name: Manual verilate -Wall (count warnings)
+        run: |
+          cd test_regress
+          perl ../bin/verilator --prefix Vtp -cc -Mdir obj_probe_manual --timing --comp-limit-members 10 --CFLAGS -O0 -Wall -Wno-fatal +incdir+t/uvm t/uvm/uvm_pkg_all_v2020_3_2_nodpi.svh t/t_uvm_hello.v > $GITHUB_WORKSPACE/probe_manual.log 2>&1 || true
+          echo "MANUAL_WARN_COUNT=$(grep -cE '%Warning-' $GITHUB_WORKSPACE/probe_manual.log || true)"
+          grep -oE '%Warning-[A-Z]+' $GITHUB_WORKSPACE/probe_manual.log | sort | uniq -c | sort -rn | head -12 || true
+          tail -3 $GITHUB_WORKSPACE/probe_manual.log
+
+      - name: Official driver single test
+        run: |
+          cd test_regress
+          python3 driver.py -j 4 t/t_uvm_hello_all_v2020_3_2_nodpi.py 2>&1 | tee $GITHUB_WORKSPACE/probe_driver.log
+          echo "DRIVER_EXIT=${PIPESTATUS[0]}" | tee -a $GITHUB_WORKSPACE/probe_driver.log
+          tail -25 $GITHUB_WORKSPACE/probe_driver.log
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          path: |
+            ${{ github.workspace }}/probe_manual.log
+            ${{ github.workspace }}/probe_driver.log
+          name: probe-logs
