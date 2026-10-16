@@ -9,11 +9,11 @@ jobs:
   probe:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout upstream verilator
+      - name: Checkout PR branch (win-uvm-complete)
         uses: actions/checkout@v5
         with:
-          repository: verilator/verilator
-          ref: master
+          repository: zxw060810/verilator
+          ref: win-uvm-complete
 
       - name: Install deps
         run: |
@@ -35,10 +35,10 @@ jobs:
           grep -oE '%Warning-[A-Z]+' $GITHUB_WORKSPACE/probe_manual.log | sort | uniq -c | sort -rn | head -12 || true
           tail -3 $GITHUB_WORKSPACE/probe_manual.log
 
-      - name: Official driver single test
+      - name: Official driver 9 UVM tests
         run: |
           cd test_regress
-          python3 driver.py -j 4 t/t_uvm_hello_all_v2020_3_2_nodpi.py 2>&1 | tee $GITHUB_WORKSPACE/probe_driver.log
+          python3 driver.py -j 4 t/t_uvm_hello_all_v2017_1_0_nodpi.py t/t_uvm_hello_all_v2017_1_0_dpi.py t/t_uvm_hello_all_v2020_3_1_nodpi.py t/t_uvm_hello_all_v2020_3_1_dpi.py t/t_uvm_hello_all_v2020_3_2_nodpi.py t/t_uvm_hello_all_v2020_3_2_dpi.py t/t_uvm_dpi_v2017_1_0.py t/t_uvm_dpi_v2020_3_1.py t/t_uvm_dpi_v2020_3_2.py 2>&1 | tee $GITHUB_WORKSPACE/probe_driver.log
           echo "DRIVER_EXIT=${PIPESTATUS[0]}" | tee -a $GITHUB_WORKSPACE/probe_driver.log
           tail -25 $GITHUB_WORKSPACE/probe_driver.log
 
